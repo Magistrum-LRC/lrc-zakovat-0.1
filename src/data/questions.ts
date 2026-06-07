@@ -1,0 +1,1 @@
+export { mockQuestions } from "./mapZakovatData";
