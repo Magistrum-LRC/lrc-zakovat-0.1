@@ -1,13 +1,39 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Eye, EyeOff, Shuffle } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Shuffle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { InlineChipFilter } from "@/components/ui/InlineChipFilter";
 import { TopicBadge } from "@/components/ui/Badges";
-import type { Question, QuestionTopic } from "@/types";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+} from "@/components/ui/pagination";
+import type { Question } from "@/types";
+
+const QUESTIONS_PER_PAGE = 20;
+
+function getVisiblePages(currentPage: number, totalPages: number): (number | "ellipsis")[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const pages = new Set<number>([1, totalPages, currentPage]);
+  for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+    if (i >= 1 && i <= totalPages) pages.add(i);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result: (number | "ellipsis")[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("ellipsis");
+    result.push(sorted[i]);
+  }
+  return result;
+}
 
 const topicOpts: { value: string; label: string }[] = [
   { value: "Все", label: "Все" },
@@ -76,6 +102,7 @@ export default function QuestionsPage() {
   const { questions } = useStore();
   const [topics, setTopics] = useState(["Все"]);
   const [difficulties, setDifficulties] = useState(["Все"]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [randomQuestion, setRandomQuestion] = useState<Question | null>(null);
   const [randomRevealed, setRandomRevealed] = useState(false);
 
@@ -101,6 +128,29 @@ export default function QuestionsPage() {
       return true;
     });
   }, [questions, topics, difficulties]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / QUESTIONS_PER_PAGE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [topics, difficulties]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * QUESTIONS_PER_PAGE;
+    return filtered.slice(start, start + QUESTIONS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * QUESTIONS_PER_PAGE + 1;
+  const rangeEnd = Math.min(currentPage * QUESTIONS_PER_PAGE, filtered.length);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="p-6 max-w-screen-xl mx-auto">
@@ -165,17 +215,85 @@ export default function QuestionsPage() {
         </div>
       </div>
 
-      {/* Questions grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map(q => (
-          <QuestionCard key={q.id} question={q} />
-        ))}
-      </div>
+      {filtered.length > 0 && (
+        <p className="text-xs text-muted-foreground mb-4">
+          {rangeStart}–{rangeEnd} из {filtered.length} вопросов
+          {totalPages > 1 && ` · страница ${currentPage} из ${totalPages}`}
+        </p>
+      )}
 
-      {filtered.length === 0 && (
+      {/* Questions grid */}
+      {filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <p>Нет вопросов с выбранными фильтрами</p>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {paginated.map(q => (
+              <QuestionCard key={q.id} question={q} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination className="mt-8">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    size="default"
+                    aria-label="Предыдущая страница"
+                    className={`gap-1 px-2.5 ${currentPage === 1 ? "pointer-events-none opacity-50" : ""}`}
+                    onClick={e => {
+                      e.preventDefault();
+                      if (currentPage > 1) goToPage(currentPage - 1);
+                    }}
+                  >
+                    <ChevronLeft className="size-4" />
+                    <span className="hidden sm:inline">Назад</span>
+                  </PaginationLink>
+                </PaginationItem>
+
+                {getVisiblePages(currentPage, totalPages).map((page, idx) =>
+                  page === "ellipsis" ? (
+                    <PaginationItem key={`ellipsis-${idx}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === currentPage}
+                        onClick={e => {
+                          e.preventDefault();
+                          goToPage(page);
+                        }}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    size="default"
+                    aria-label="Следующая страница"
+                    className={`gap-1 px-2.5 ${currentPage === totalPages ? "pointer-events-none opacity-50" : ""}`}
+                    onClick={e => {
+                      e.preventDefault();
+                      if (currentPage < totalPages) goToPage(currentPage + 1);
+                    }}
+                  >
+                    <span className="hidden sm:inline">Вперёд</span>
+                    <ChevronRight className="size-4" />
+                  </PaginationLink>
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
     </div>
   );
