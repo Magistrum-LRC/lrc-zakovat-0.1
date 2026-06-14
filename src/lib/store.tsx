@@ -70,7 +70,21 @@ function loadData(): AppData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as AppData;
+      const hasLegacyHallOfFame = parsed.hallOfFame?.some(
+        (entry) => !entry.id.startsWith("hof_supercup_") || entry.season === "2022",
+      );
+      const hasOutdatedHallOfFame = parsed.hallOfFame?.some(
+        (entry) =>
+          entry.id === "hof_supercup_2026_05_megas" &&
+          (entry.cups !== 5 || entry.teamPhoto !== mockHallOfFame.find((hof) => hof.id === entry.id)?.teamPhoto),
+      );
+      const hasOutdatedHallOfFamePhotos = mockHallOfFame.some(
+        (entry) => parsed.hallOfFame?.find((storedEntry) => storedEntry.id === entry.id)?.teamPhoto !== entry.teamPhoto,
+      );
+      return hasLegacyHallOfFame || hasOutdatedHallOfFame || hasOutdatedHallOfFamePhotos
+        ? { ...parsed, hallOfFame: mockHallOfFame }
+        : parsed;
     }
   } catch (e) {
     console.error("Failed to load data from localStorage:", e);

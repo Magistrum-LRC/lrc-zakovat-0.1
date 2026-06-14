@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MedalSummary } from "@/components/ui/Badges";
+import type { HallOfFameEntry } from "@/types";
 
 const recordColors: Record<string, string> = {
   "Первый чемпион": "bg-amber-100 text-amber-700 border-amber-200",
@@ -13,11 +14,19 @@ const recordColors: Record<string, string> = {
   "Новый чемпион": "bg-blue-100 text-blue-700 border-blue-200",
   "Тройная корона": "bg-orange-100 text-orange-700 border-orange-200",
   "Текущий лидер": "bg-green-100 text-green-700 border-green-200",
+  "Итоговый лидер": "bg-amber-100 text-amber-700 border-amber-200",
+  "Финальный чемпион": "bg-green-100 text-green-700 border-green-200",
+  "Суперкубок": "bg-green-100 text-green-700 border-green-200",
 };
 
 export default function HallOfFamePage() {
   const { hallOfFame } = useStore();
   const sorted = [...hallOfFame].sort((a, b) => b.year - a.year);
+  const championCount = new Set(hallOfFame.map((entry) => entry.championTeam)).size;
+  const recordHolder = hallOfFame.reduce<HallOfFameEntry | null>(
+    (best, entry) => (!best || entry.cups > best.cups ? entry : best),
+    null,
+  );
 
   return (
     <div className="p-6 max-w-screen-xl mx-auto">
@@ -29,16 +38,16 @@ export default function HallOfFamePage() {
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
         <GlassCard className="py-3 px-4 text-center">
-          <p className="text-2xl font-bold text-primary">5</p>
+          <p className="text-2xl font-bold text-primary">{hallOfFame.length}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Сезонов</p>
         </GlassCard>
         <GlassCard className="py-3 px-4 text-center">
-          <p className="text-2xl font-bold text-amber-600">2</p>
+          <p className="text-2xl font-bold text-amber-600">{championCount}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Команды-чемпионы</p>
         </GlassCard>
         <GlassCard className="py-3 px-4 text-center col-span-2 sm:col-span-1">
-          <p className="text-2xl font-bold text-foreground">4×</p>
-          <p className="text-xs text-muted-foreground mt-0.5">МЕГАС — рекорд побед</p>
+          <p className="text-2xl font-bold text-foreground">{recordHolder?.cups ?? 0}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{recordHolder?.championTeam ?? "—"} — рекорд кубков</p>
         </GlassCard>
       </div>
 
@@ -84,7 +93,7 @@ export default function HallOfFamePage() {
                         {isLatest && (
                           <div className="absolute top-2 right-2">
                             <span className="bg-green-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              Идёт
+                              Финал
                             </span>
                           </div>
                         )}
